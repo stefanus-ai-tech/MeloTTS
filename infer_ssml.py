@@ -5,8 +5,6 @@ from melo.models import MeloTTS
 import logging
 import torchaudio
 import re
-from xml.etree import ElementTree
-import torch.nn.functional as F
 from bs4 import BeautifulSoup
 from typing import Dict, Any
 

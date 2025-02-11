@@ -1157,6 +1157,7 @@ import torch
 import torch.nn as nn
 from pathlib import Path
 from melo.text.ssml_parser import SSMLParser
+from melo.text.phonemizer import Phonemizer
 
 class MeloTTS(SynthesizerTrn):
     def __init__(self, n_vocab=219, spec_channels=1025, **kwargs):
