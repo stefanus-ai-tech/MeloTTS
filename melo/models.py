@@ -325,9 +325,9 @@ class TextEncoder(nn.Module):
     ):
         super().__init__()
         if num_languages is None:
-            from text import num_languages
+            from melo.text import num_languages
         if num_tones is None:
-            from text import num_tones
+            from melo.text import num_tones
         self.n_vocab = n_vocab
         self.out_channels = out_channels
         self.hidden_channels = hidden_channels
@@ -855,7 +855,7 @@ class SynthesizerTrn(nn.Module):
                 hidden_channels,
                 filter_channels,
                 n_heads,
-                n_layers_trans_flow,
+                3,
                 5,
                 p_dropout,
                 n_flow_layer,
@@ -933,7 +933,7 @@ class SynthesizerTrn(nn.Module):
                 hidden_channels,
                 filter_channels,
                 n_heads,
-                n_layers_trans_flow,
+                3,
                 5,
                 p_dropout,
                 n_flow_layer,
@@ -1129,3 +1129,91 @@ class SynthesizerTrn(nn.Module):
         z_hat = self.flow(z_p, y_mask, g=g_tgt, reverse=True)
         o_hat = self.dec(z_hat * y_mask, g=g_tgt)
         return o_hat, y_mask, (z, z_p, z_hat)
+
+
+import torch
+import torch.nn as nn
+from pathlib import Path
+
+class MeloTTS(SynthesizerTrn):
+    def __init__(self, n_vocab=148, spec_channels=513, **kwargs):
+        super().__init__(
+            n_vocab=n_vocab,
+            spec_channels=spec_channels,
+            segment_size=32,
+            inter_channels=192,
+            hidden_channels=192,
+            filter_channels=768,
+            n_heads=2,
+            n_layers=6,
+            kernel_size=3,
+            p_dropout=0.1,
+            resblock="1",
+            resblock_kernel_sizes=[3, 7, 11],
+            resblock_dilation_sizes=[[1, 3, 5], [1, 3, 5], [1, 3, 5]],
+            upsample_rates=[8, 8, 2, 2],
+            upsample_initial_channel=512,
+            upsample_kernel_sizes=[16, 16, 4, 4],
+            n_speakers=0,
+            gin_channels=256,
+            use_sdp=True,
+            **kwargs
+        )
+        self.sample_rate = 22050
+
+    @classmethod
+    def from_pretrained(cls, checkpoint_path: Path):
+        model = cls()
+        checkpoint = torch.load(checkpoint_path, map_location='cpu')
+        model.load_state_dict(checkpoint['model'])
+        return model
+
+    def tts_with_ssml(self, ssml_text: str) -> torch.Tensor:
+        # Basic SSML processing implementation
+        from bs4 import BeautifulSoup
+        
+        soup = BeautifulSoup(ssml_text, 'xml')
+        text = soup.get_text()  # For now, just get raw text
+        ssml_attributes = {}
+        
+        # Extract voice name if present
+        voice_tag = soup.find('voice')
+        if voice_tag and 'name' in voice_tag.attrs:
+            ssml_attributes['voice_name'] = voice_tag['name']
+            
+        # Extract break tags
+        break_tags = soup.find_all('break')
+        if break_tags:
+            ssml_attributes['break'] = []
+            for break_tag in break_tags:
+                break_info = {}
+                if 'time' in break_tag.attrs:
+                    break_info['time'] = break_tag['time']
+                if 'strength' in break_tag.attrs:
+                    break_info['strength'] = break_tag['strength']
+                ssml_attributes['break'].append(break_info)
+
+        # Convert text to tensor input (placeholder - you need to implement proper text processing)
+        x = torch.zeros((1, len(text)), dtype=torch.long)  # Replace with actual text processing
+        x_lengths = torch.tensor([len(text)], dtype=torch.long)
+        
+        # Set default speaker
+        sid = torch.tensor([0], dtype=torch.long)
+        
+        # Run inference with SSML attributes
+        with torch.no_grad():
+            audio = self.infer(
+                x, 
+                x_lengths,
+                sid=sid,
+                noise_scale=0.667,
+                noise_scale_w=0.8,
+                length_scale=1.0,
+                ssml_attributes=ssml_attributes
+            )[0][0,0].data
+            
+        return audio
+
+    def forward(self, x):
+        # Use parent's forward implementation
+        return super().forward(x)

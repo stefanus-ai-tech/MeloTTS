@@ -1,3 +1,16 @@
+# Basic character set
+_pad = '_'
+_punctuation = ';:,.!?¡¿—…"«»"" '
+_letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
+_letters_ipa = "ɑɐɒæɓʙβɔɕçɗɖðʤəɘɚɛɜɝɞɟʄɡɠɢʛɦɧħɥʜɨɪʝɭɬɫɮʟɱɯɰŋɳɲɴøɵɸθœɶʘɹɺɾɻʀʁɽʂʃʈʧʉʊʋⱱʌɣɤʍχʎʏʑʐʒʔʡʕʢǀǁǂǃˈˌːˑʼʴʰʱʲʷˠˤ˞↓↑→↗↘'̩'ᵻ"
+
+# Export all symbols
+symbols = [_pad] + list(_punctuation) + list(_letters) + list(_letters_ipa)
+
+# Constants for language and tone support
+num_languages = 10  # Number of supported languages
+num_tones = 16     # Number of supported tones
+
 # punctuation = ["!", "?", "…", ",", ".", "'", "-"]
 punctuation = ["!", "?", "…", ",", ".", "'", "-", "¿", "¡"]
 pu_symbols = punctuation + ["SP", "UNK"]

@@ -1,6 +1,7 @@
 import torch
 import os
-from . import utils
+import requests
+from melo import utils
 from cached_path import cached_path
 from huggingface_hub import hf_hub_download
 
@@ -65,3 +66,24 @@ def load_or_download_model(locale, device, use_hf=True, ckpt_path=None):
 
 def load_pretrain_model():
     return [cached_path(url) for url in PRETRAINED_MODELS.values()]
+
+def download_checkpoint(url, dest_folder="checkpoints"):
+    os.makedirs(dest_folder, exist_ok=True)
+    filename = os.path.join(dest_folder, url.split("/")[-1])
+    if os.path.exists(filename):
+        print(f"{filename} already exists. Skipping download.")
+        return filename
+    print(f"Downloading {url} to {filename}")
+    response = requests.get(url, stream=True)
+    response.raise_for_status()
+    with open(filename, "wb") as f:
+        for chunk in response.iter_content(chunk_size=8192):
+            if chunk:
+                f.write(chunk)
+    print("Download finished.")
+    return filename
+
+if __name__ == "__main__":
+    # Use the resolved raw URL for downloading
+    checkpoint_url = "https://huggingface.co/myshell-ai/MeloTTS-English/resolve/main/checkpoint.pth"
+    download_checkpoint(checkpoint_url)
