@@ -23,6 +23,9 @@ def main():
     with torch.no_grad():
         audio = model.tts_with_ssml(ssml_text)
     
+    # Ensure audio is in float32 format
+    audio = audio.float()
+    
     # Save the audio
     torchaudio.save(output_path, audio.cpu(), sample_rate=model.sample_rate)
     print(f"Generated audio saved to: {output_path}")

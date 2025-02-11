@@ -1136,7 +1136,7 @@ import torch.nn as nn
 from pathlib import Path
 
 class MeloTTS(SynthesizerTrn):
-    def __init__(self, n_vocab=148, spec_channels=513, **kwargs):
+    def __init__(self, n_vocab=219, spec_channels=1025, **kwargs):
         super().__init__(
             n_vocab=n_vocab,
             spec_channels=spec_channels,
@@ -1154,18 +1154,32 @@ class MeloTTS(SynthesizerTrn):
             upsample_rates=[8, 8, 2, 2],
             upsample_initial_channel=512,
             upsample_kernel_sizes=[16, 16, 4, 4],
-            n_speakers=0,
+            n_speakers=256,  # Changed from 0 to 256 to use speaker embeddings
             gin_channels=256,
             use_sdp=True,
             **kwargs
         )
         self.sample_rate = 22050
+        
+        # Initialize default speaker mapping
+        self.spk2id = {
+            'default': 0,
+            'en-US-JennyNeural': 0,  # Map all voices to default speaker for now
+            'en-US-GuyNeural': 0,
+        }
 
     @classmethod
     def from_pretrained(cls, checkpoint_path: Path):
         model = cls()
         checkpoint = torch.load(checkpoint_path, map_location='cpu')
-        model.load_state_dict(checkpoint['model'])
+        state_dict = checkpoint['model']
+        
+        # Filter out unexpected keys
+        model_state_dict = model.state_dict()
+        filtered_state_dict = {k: v for k, v in state_dict.items() if k in model_state_dict and v.shape == model_state_dict[k].shape}
+        
+        # Load the filtered state_dict
+        model.load_state_dict(filtered_state_dict, strict=False)
         return model
 
     def tts_with_ssml(self, ssml_text: str) -> torch.Tensor:
@@ -1194,23 +1208,38 @@ class MeloTTS(SynthesizerTrn):
                 ssml_attributes['break'].append(break_info)
 
         # Convert text to tensor input (placeholder - you need to implement proper text processing)
-        x = torch.zeros((1, len(text)), dtype=torch.long)  # Replace with actual text processing
-        x_lengths = torch.tensor([len(text)], dtype=torch.long)
+        device = next(self.parameters()).device
+        x = torch.zeros((1, len(text)), dtype=torch.long, device=device)  # Replace with actual text processing
+        x_lengths = torch.tensor([len(text)], dtype=torch.long, device=device)
+        
+        # Default values for required tensors
+        tone = torch.zeros_like(x)  # Default tone
+        language = torch.zeros_like(x)  # Default language (assuming language ID 0)
+        bert = torch.zeros((1, 1024, x.size(1)), device=device)  # Empty BERT embeddings
+        ja_bert = torch.zeros((1, 768, x.size(1)), device=device)  # Empty Japanese BERT embeddings
         
         # Set default speaker
-        sid = torch.tensor([0], dtype=torch.long)
+        sid = torch.tensor([0], dtype=torch.long, device=device)
         
         # Run inference with SSML attributes
         with torch.no_grad():
+            # Get raw audio from inference
             audio = self.infer(
                 x, 
                 x_lengths,
                 sid=sid,
+                tone=tone,
+                language=language,
+                bert=bert,
+                ja_bert=ja_bert,
                 noise_scale=0.667,
                 noise_scale_w=0.8,
                 length_scale=1.0,
                 ssml_attributes=ssml_attributes
-            )[0][0,0].data
+            )[0]  # [1, 1, T]
+            
+            # Reshape to [channels, samples] format for torchaudio
+            audio = audio.squeeze(0)  # Remove batch dimension -> [1, T]
             
         return audio
 
