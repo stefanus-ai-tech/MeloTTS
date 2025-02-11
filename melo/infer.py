@@ -1,6 +1,7 @@
 import os
 import click
 from melo.api import TTS
+from melo.ssml import extract_text_from_ssml
 
     
     
@@ -18,13 +19,16 @@ def main(ckpt_path, text, language, output_dir, ssml):
     model = TTS(language=language, config_path=config_path, ckpt_path=ckpt_path)
 
     if ssml:
-        with open("test_ssml.txt", "r") as f:
-            text = f.read()
+        ssml_data = extract_text_from_ssml(text)
+        text = ssml_data['text']
+        ssml_attributes = ssml_data['ssml_attributes']
+    else:
+        ssml_attributes = {}
 
     for spk_name, spk_id in model.hps.data.spk2id.items():
         save_path = f'{output_dir}/{spk_name}/output.wav'
         os.makedirs(os.path.dirname(save_path), exist_ok=True)
-        model.tts_to_file(text, spk_id, save_path, ssml=ssml)
+        model.tts_to_file(text, spk_id, save_path, ssml=ssml, ssml_attributes=ssml_attributes)
 
 if __name__ == "__main__":
     main()
