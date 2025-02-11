@@ -1156,6 +1156,7 @@ class SynthesizerTrn(nn.Module):
 import torch
 import torch.nn as nn
 from pathlib import Path
+from melo.text.ssml_parser import SSMLParser
 
 class MeloTTS(SynthesizerTrn):
     def __init__(self, n_vocab=219, spec_channels=1025, **kwargs):
@@ -1189,6 +1190,9 @@ class MeloTTS(SynthesizerTrn):
             'en-US-JennyNeural': 0,  # Map all voices to default speaker for now
             'en-US-GuyNeural': 0,
         }
+        self.ssml_parser = SSMLParser()
+        from melo.text.phonemizer import Phonemizer
+        self.phonemizer = Phonemizer()
 
     @classmethod
     def from_pretrained(cls, checkpoint_path: Path):
@@ -1217,9 +1221,11 @@ class MeloTTS(SynthesizerTrn):
 
         # Call english_cleaners2 directly with the text.
         cleaned_text = english_cleaners2(text) # call the function directly
-        sequence = text_to_sequence(cleaned_text)
-
-        # ...existing code to convert sequence to tensor and run inference...
+        phonemes = self.phonemizer.phonemize(cleaned_text, language='en-us')
+        
+        # Convert phonemes to sequence
+        sequence = text_to_sequence(phonemes)
+        # ...rest of existing code...
         device = next(self.parameters()).device
         x = torch.tensor(sequence, dtype=torch.long, device=device).unsqueeze(0)
         x_lengths = torch.tensor([len(sequence)], dtype=torch.long, device=device)

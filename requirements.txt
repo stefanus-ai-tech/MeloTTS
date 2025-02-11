@@ -37,3 +37,5 @@ num_thai>=0.0.5
 opencc>=1.1.1
 beautifulsoup4>=4.9.3
 lxml>=4.9.0
+phonemizer>=3.0.1
+espeak-ng
