@@ -1119,6 +1119,28 @@ class SynthesizerTrn(nn.Module):
                 elif break_data.get('strength'):
                     #TODO: handle strength
                     pass
+
+        # Enhanced SSML processing
+        if ssml_attributes:
+            # Handle voice changes
+            if 'voice' in ssml_attributes:
+                for voice in ssml_attributes['voice']:
+                    if voice['name'] in self.spk2id:
+                        sid = torch.LongTensor([self.spk2id[voice['name']]]).to(x.device)
+
+            # Handle express-as styles
+            if 'mstts:express-as' in ssml_attributes:
+                for style in ssml_attributes['mstts:express-as']:
+                    # Adjust model parameters based on style
+                    if style['style'] == 'cheerful':
+                        noise_scale *= 1.1
+                        length_scale *= 0.95
+                    elif style['style'] == 'sad':
+                        noise_scale *= 0.9
+                        length_scale *= 1.1
+                    elif style['style'] == 'whispering':
+                        noise_scale *= 0.7
+
         return o, attn, y_mask, (z, z_p, m_p, logs_p)
 
     def voice_conversion(self, y, y_lengths, sid_src, sid_tgt, tau=1.0):        
@@ -1183,38 +1205,28 @@ class MeloTTS(SynthesizerTrn):
         return model
 
     def tts_with_ssml(self, ssml_text: str) -> torch.Tensor:
-        # Basic SSML processing implementation
         from bs4 import BeautifulSoup
-        
+        # Corrected import for english_cleaners2
+        from melo.text import text_to_sequence
+        from melo.text.cleaners import english_cleaners2 # directly import the function
+        # ...existing code...
         soup = BeautifulSoup(ssml_text, 'xml')
-        text = soup.get_text()  # For now, just get raw text
+        text = soup.get_text().strip()  # Get raw text and remove extra whitespace
         ssml_attributes = {}
-        
-        # Extract voice name if present
-        voice_tag = soup.find('voice')
-        if voice_tag and 'name' in voice_tag.attrs:
-            ssml_attributes['voice_name'] = voice_tag['name']
-            
-        # Extract break tags
-        break_tags = soup.find_all('break')
-        if break_tags:
-            ssml_attributes['break'] = []
-            for break_tag in break_tags:
-                break_info = {}
-                if 'time' in break_tag.attrs:
-                    break_info['time'] = break_tag['time']
-                if 'strength' in break_tag.attrs:
-                    break_info['strength'] = break_tag['strength']
-                ssml_attributes['break'].append(break_info)
+        # ...existing code for extracting attributes...
 
-        # Convert text to tensor input (placeholder - you need to implement proper text processing)
+        # Call english_cleaners2 directly with the text.
+        cleaned_text = english_cleaners2(text) # call the function directly
+        sequence = text_to_sequence(cleaned_text)
+
+        # ...existing code to convert sequence to tensor and run inference...
         device = next(self.parameters()).device
-        x = torch.zeros((1, len(text)), dtype=torch.long, device=device)  # Replace with actual text processing
-        x_lengths = torch.tensor([len(text)], dtype=torch.long, device=device)
+        x = torch.tensor(sequence, dtype=torch.long, device=device).unsqueeze(0)
+        x_lengths = torch.tensor([len(sequence)], dtype=torch.long, device=device)
         
         # Default values for required tensors
         tone = torch.zeros_like(x)  # Default tone
-        language = torch.zeros_like(x)  # Default language (assuming language ID 0)
+        language = torch.zeros_like(x)  # English language ID
         bert = torch.zeros((1, 1024, x.size(1)), device=device)  # Empty BERT embeddings
         ja_bert = torch.zeros((1, 768, x.size(1)), device=device)  # Empty Japanese BERT embeddings
         
@@ -1223,7 +1235,6 @@ class MeloTTS(SynthesizerTrn):
         
         # Run inference with SSML attributes
         with torch.no_grad():
-            # Get raw audio from inference
             audio = self.infer(
                 x, 
                 x_lengths,
@@ -1232,13 +1243,12 @@ class MeloTTS(SynthesizerTrn):
                 language=language,
                 bert=bert,
                 ja_bert=ja_bert,
-                noise_scale=0.667,
+                noise_scale=0.667,  # Adjust these parameters for better quality
                 noise_scale_w=0.8,
                 length_scale=1.0,
                 ssml_attributes=ssml_attributes
-            )[0]  # [1, 1, T]
+            )[0]
             
-            # Reshape to [channels, samples] format for torchaudio
             audio = audio.squeeze(0)  # Remove batch dimension -> [1, T]
             
         return audio
