@@ -12,6 +12,7 @@ import librosa
 from melo.text import cleaned_text_to_sequence, get_bert
 from melo.text.cleaner import clean_text
 from melo import commons
+from melo.ssml import extract_text_from_ssml
 
 MATPLOTLIB_FLAG = False
 
@@ -20,6 +21,8 @@ logger = logging.getLogger(__name__)
 
 
 def get_text_for_tts_infer(text, language_str, hps, device, symbol_to_id=None):
+    if text.startswith("<speak>"):
+        text = extract_text_from_ssml(text)
     norm_text, phone, tone, word2ph = clean_text(text, language_str)
     phone, tone, language = cleaned_text_to_sequence(phone, tone, language_str, symbol_to_id)
 

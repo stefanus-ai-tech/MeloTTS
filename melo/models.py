@@ -882,8 +882,88 @@ class SynthesizerTrn(nn.Module):
             self.emb_g = nn.Embedding(n_speakers, gin_channels)
         else:
             self.ref_enc = ReferenceEncoder(spec_channels, gin_channels, layernorm=norm_refenc)
-        self.use_vc = use_vc
+        self.n_layers_trans_flow = n_layers_trans_flow
+        self.use_spk_conditioned_encoder = kwargs.get(
+            "use_spk_conditioned_encoder", True
+        )
+        self.use_sdp = use_sdp
+        self.use_noise_scaled_mas = kwargs.get("use_noise_scaled_mas", False)
+        self.mas_noise_scale_initial = kwargs.get("mas_noise_scale_initial", 0.01)
+        self.noise_scale_delta = kwargs.get("noise_scale_delta", 2e-6)
+        self.current_mas_noise_scale = self.mas_noise_scale_initial
+        if self.use_spk_conditioned_encoder and gin_channels > 0:
+            self.enc_gin_channels = gin_channels
+        else:
+            self.enc_gin_channels = 0
+        self.enc_p = TextEncoder(
+            n_vocab,
+            inter_channels,
+            hidden_channels,
+            filter_channels,
+            n_heads,
+            n_layers,
+            kernel_size,
+            p_dropout,
+            gin_channels=self.enc_gin_channels,
+            num_languages=num_languages,
+            num_tones=num_tones,
+        )
+        self.dec = Generator(
+            inter_channels,
+            resblock,
+            resblock_kernel_sizes,
+            resblock_dilation_sizes,
+            upsample_rates,
+            upsample_initial_channel,
+            upsample_kernel_sizes,
+            gin_channels=gin_channels,
+        )
+        self.enc_q = PosteriorEncoder(
+            spec_channels,
+            inter_channels,
+            hidden_channels,
+            5,
+            1,
+            16,
+            gin_channels=gin_channels,
+        )
+        if use_transformer_flow:
+            self.flow = TransformerCouplingBlock(
+                inter_channels,
+                hidden_channels,
+                filter_channels,
+                n_heads,
+                n_layers_trans_flow,
+                5,
+                p_dropout,
+                n_flow_layer,
+                gin_channels=gin_channels,
+                share_parameter=flow_share_parameter,
+            )
+        else:
+            self.flow = ResidualCouplingBlock(
+                inter_channels,
+                hidden_channels,
+                5,
+                1,
+                n_flow_layer,
+                gin_channels=gin_channels,
+            )
+        self.sdp = StochasticDurationPredictor(
+            hidden_channels, 192, 3, 0.5, 4, gin_channels=gin_channels
+        )
+        self.dp = DurationPredictor(
+            hidden_channels, 256, 3, 0.5, gin_channels=gin_channels
+        )
 
+        if n_speakers > 0:
+            self.emb_g = nn.Embedding(n_speakers, gin_channels)
+            self.spk2id = None # to be initialized later
+        else:
+            self.ref_enc = ReferenceEncoder(spec_channels, gin_channels, layernorm=norm_refenc)
+        self.use_vc = use_vc
+        self.spk2id = kwargs.get("spk2id", None)
+        self.sampling_rate = kwargs.get("sampling_rate", 22050) # NEW LINE
 
     def forward(self, x, x_lengths, y, y_lengths, sid, tone, language, bert, ja_bert):
         if self.n_speakers > 0:
@@ -979,9 +1059,19 @@ class SynthesizerTrn(nn.Module):
         sdp_ratio=0,
         y=None,
         g=None,
+        ssml_attributes=None
     ):
-        # x, m_p, logs_p, x_mask = self.enc_p(x, x_lengths, tone, language, bert)
-        # g = self.gst(y)
+        if ssml_attributes is None:
+            ssml_attributes = {}
+
+        if ssml_attributes.get('voice_name') is not None:
+            voice_name = ssml_attributes['voice_name']
+            if self.spk2id is not None and voice_name in self.spk2id:
+                sid = torch.LongTensor([self.spk2id[voice_name]]).to(x.device)
+                # print(f"Using speaker ID {sid} for voice name {voice_name}") # NO PRINT
+            else:
+                print(f"Warning: voice name {voice_name} not found, using default speaker")
+
         if g is None:
             if self.n_speakers > 0:
                 g = self.emb_g(sid).unsqueeze(-1)  # [b, h, 1]
@@ -1018,6 +1108,17 @@ class SynthesizerTrn(nn.Module):
         z = self.flow(z_p, y_mask, g=g, reverse=True)
         o = self.dec((z * y_mask)[:, :, :max_len], g=g)
         # print('max/min of o:', o.max(), o.min())
+
+        # Handle break tag
+        if 'break' in ssml_attributes:
+            for break_data in ssml_attributes['break']:
+                if break_data.get('time'):
+                    break_time_ms = int(break_data['time'].rstrip('ms'))
+                    break_samples = int(break_time_ms / 1000 * self.sampling_rate)
+                    o = torch.cat([o, torch.zeros(1, 1, break_samples).to(o.device)], dim=2) # add silence
+                elif break_data.get('strength'):
+                    #TODO: handle strength
+                    pass
         return o, attn, y_mask, (z, z_p, m_p, logs_p)
 
     def voice_conversion(self, y, y_lengths, sid_src, sid_tgt, tau=1.0):        

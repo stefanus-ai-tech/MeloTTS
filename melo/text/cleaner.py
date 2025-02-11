@@ -1,12 +1,15 @@
 from . import chinese, japanese, english, chinese_mix, korean, french, spanish
 from . import cleaned_text_to_sequence
 import copy
+from melo.ssml import extract_text_from_ssml
 
 language_module_map = {"ZH": chinese, "JP": japanese, "EN": english, 'ZH_MIX_EN': chinese_mix, 'KR': korean,
                     'FR': french, 'SP': spanish, 'ES': spanish}
 
 
 def clean_text(text, language):
+    if text.startswith("<speak>"):
+        text = extract_text_from_ssml(text)
     language_module = language_module_map[language]
     norm_text = language_module.text_normalize(text)
     phones, tones, word2ph = language_module.g2p(norm_text)
@@ -28,6 +31,8 @@ def clean_text_bert(text, language, device=None):
 
 
 def text_to_sequence(text, language):
+    if text.startswith("<speak>"):
+        text = extract_text_from_ssml(text)
     norm_text, phones, tones, word2ph = clean_text(text, language)
     return cleaned_text_to_sequence(phones, tones, language)
 

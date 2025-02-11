@@ -1,0 +1,90 @@
+<speak version="1.1" xmlns="http://www.w3.org/2001/10/synthesis"
+       xmlns:mstts="https://www.w3.org/2001/mstts" xml:lang="en-US">
+  <voice name="en-US-JennyNeural">
+    <mstts:express-as style="cheerful">
+      Hello there!  It's wonderful to be talking to you today.
+    </mstts:express-as>
+    <break time="500ms"/>  <!-- Half a second pause -->
+    <p>
+      Let's explore some of the amazing capabilities of SSML, shall we?
+      <emphasis level="strong">This</emphasis> is a demonstration of complex text-to-speech manipulation.
+    </p>
+    <p>
+      We can control <emphasis level="moderate">prosody</emphasis>, which encompasses various aspects of speech, like
+       <prosody rate="1.2" pitch="+10%" contour="(0%,+20%)(50%,-10%)(100%,+0%)">rate, pitch, and intonation</prosody>.
+      Listen to how this sentence sounds different!
+    </p>
+
+    <p>
+        Here's a sentence using <say-as interpret-as="characters">SSML</say-as>.  And now, let's spell out a word:
+        <say-as interpret-as="spell-out">example</say-as>.
+    </p>
+
+    <p>
+      We can even incorporate different voices!
+      <!-- Switch to a different voice for a short phrase -->
+        <voice name="en-US-GuyNeural">
+          <emphasis level="reduced">Isn't that cool?</emphasis>
+        </voice>
+        <voice name="en-US-JennyNeural">
+          <!--Important to switch back if we keep going-->
+            Absolutely!
+        </voice>
+    </p>
+      <p>
+          Now listen to a phone number and a date:
+      </p>
+
+    <p>
+      Phone Number: <say-as interpret-as="telephone">1-800-555-1212</say-as>
+      <break strength="medium"/>
+      Date: <say-as interpret-as="date" format="mdy">03/15/2024</say-as>
+    </p>
+
+     <p>
+      And how about some cardinal and ordinal numbers?
+    </p>
+
+    <p>
+       Cardinal: <say-as interpret-as="cardinal">12345</say-as>.
+        <break time="200ms"/>
+       Ordinal:  <say-as interpret-as="ordinal">42</say-as>.
+        <break time="200ms"/>
+        Fraction: <say-as interpret-as="fraction">5/16</say-as>
+        <break time="200ms"/>
+         Measure: <say-as interpret-as="measure">10ft</say-as>
+        <break time="200ms"/>
+         Time (24-hour):  <say-as interpret-as="time" format="hms24">14:35</say-as>
+        <break time="200ms"/>
+        Time (12-hour): <say-as interpret-as="time">2:35pm</say-as>.
+        <break time="200ms"/>
+        Address: <say-as interpret-as="address">1600 Amphitheatre Parkway, Mountain View, CA</say-as>
+    </p>
+    <p>
+      We can also use the <phoneme alphabet="ipa" ph="təˈmeɪtoʊ">tomato</phoneme> tag for custom pronunciations.  Here is another pronunciation, using SAPI 5:  <phoneme alphabet="sapi" ph=".tEH0-.mEY1-.tOW0">tomato</phoneme>. And here is a word that is not in the lexicon, but we'll give it a pronunciation hint:  <phoneme alphabet="ipa" ph="ˈʃɑːdənˌfrɔɪdə">Schadenfreude</phoneme>.
+    </p>
+    <p>
+        <sub alias="World Wide Web Consortium">W3C</sub> is the organization that created SSML.  Aliases are helpful!
+    </p>
+  <p>
+    We can insert audio files, like this: <audio src="https://www.example.com/audio/chime.wav"/> (Note: this is a placeholder URL).
+  </p>
+
+      <p>
+          Finally, we can control the volume. <prosody volume="x-loud">This is extra loud!</prosody>  <prosody volume="-6dB">This is 6 decibels quieter.</prosody>
+      </p>
+
+     <p>  <!--A whispering section-->
+        <mstts:express-as style="whispering">
+            This section is whispered... can you even hear me?
+        </mstts:express-as>
+     </p>
+
+      <p>
+          This concludes our extensive SSML demonstration!
+      </p>
+      <p>
+            <prosody rate="slow">Thank you for listening.</prosody>
+      </p>
+  </voice>
+</speak>
